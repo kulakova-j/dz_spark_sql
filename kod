@@ -1,0 +1,49 @@
+>>> df_covid = spark.read.csv('owid-covid-data.csv', sep=',', header=True, inferSchema=True)
+
+>>> from pyspark.sql.functions import desc, max, col, lit, rank, lag
+
+>>> from pyspark.sql.window import Window
+
+Num_1.
+>>> df_covid_1 = df_covid.select('iso_code', 'location', 'date', 'total_cases', 'population').filter(col('date') == lit('2021-03-31'))
+
+>>> df_covid_1 = df_covid_1.withColumn('per_had_been_ill', df_covid_1['total_cases'] * 100 / df_covid_1['population'])
+
+>>> df_covid_1 = df_covid_1.orderBy(desc('per_had_been_ill')).limit(15)
+
+>>> df_covid_1.show()
+>>> df_covid_1.write.csv('DZ_1.csv', header=True)
+
+Num_2.
+
+>>> df_covid_2 = df_covid.select('location', 'date', 'new_cases').filter((col('date') >= lit('2021-03-25')) & (col('date') <= lit('2021-03-31')))
+
+>>> windowSpec = Window().partitionBy(['location']).orderBy(desc('new_cases'))
+
+>>> df_covid_2 = df_covid_2.withColumn('rank', rank().over(windowSpec))
+
+>>> df_covid_2.show(10)
+
+>>> df_covid_2 = df_covid_2.select('location', 'date', 'new_cases').filter(col('rank') == lit('1'))
+
+>>> df_covid_2 = df_covid_2.orderBy(desc('new_cases')).limit(10)
+
+>>> df_covid_2.show()
+
+>>> df_covid_2.write.csv('DZ_2.csv', header=True)
+
+Num_3.
+
+>>> df_covid_3 = df_covid.select('location', 'date', 'new_cases').filter((col('location') == lit('Russia')) & (col('date') >= lit('2021-03-24')) & (col('date') <= lit('2021-03-31')))
+
+>>> df_covid_3.show()
+
+>>> windowSpec = Window().partitionBy('location').orderBy('date')
+
+>>> df_covid_3 = df_covid_3.withColumn('new_cases_yesterday', lag('new_cases',1).over(windowSpec))
+
+>>> df_covid_3 = df_covid_3.filter(col('date') != lit('2021-03-24')).withColumn('delta', col('new_cases') — col('new_cases_yesterday'))
+
+>>> df_covid_3.show()
+
+>>> df_covid_3.select('date', 'new_cases_yesterday', 'new_cases', 'delta').write.csv('DZ_3.scv', header=True)
